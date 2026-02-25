@@ -39,8 +39,6 @@ class mainWindow(QMainWindow):
 
         self.plots = [[]]
         self.files = []
-        self.lefts = []
-        self.rights = []
         self.spacings = [0.2]
         self.cutoffs = []
         self.titles = []
