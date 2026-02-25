@@ -11,6 +11,7 @@ Primarily supports Rigaku's RAS files, but can also support INT files generated 
 - Batch import of multiple XRD files
 - 1D diffraction plots (automatically normalized)
 - 2D colormaps (raw / log scaling)
+- Ability to save plots as PNG files
 - Automatic peak detection
 
 ## Languages / Packages Used
