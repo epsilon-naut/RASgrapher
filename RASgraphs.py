@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.animation as anim
 import math
 import scipy.signal as scp
+import csv
 
 def file_read_ras(filename):
     f = open(filename)
@@ -57,11 +58,60 @@ def file_read_int(filename):
             read = True
     return theta, intensity
 
-def file_read_gen(filename):
+def file_read_xas_csv(filename):
+    intensity = []
+    energy = []
+
+    with open (filename, mode = "r") as f:
+        head = 0
+        for lines in f:
+            if head < 2:
+                head += 1
+            else:
+               pts = lines.split(",")
+               energy.append(float(pts[0]))
+               intensity.append(float(pts[1][:-1]))
+        
+    return energy, intensity
+
+def file_read_rixs_csv(filename):
+    intensity = []
+    in_energy = []
+    out_energy = []
+
+    head = True
+
+    with open (filename, mode = "r") as f:
+        for lines in f:
+            pts = lines[:-1].split(",")
+            if head:
+                head = False
+                end = 1
+                while(pts[end] != ''):
+                    end += 1
+                in_energy = pts[1:end]
+                for i in range(len(in_energy)):
+                    in_energy[i] = float(in_energy[i])
+            else:
+                out_energy.append(float(pts[0]))
+                for i in range(1, end):
+                    pts[i] = float(pts[i])
+                intensity.append(pts[1:end])
+
+    intensity.append(out_energy)
+    
+    return in_energy, intensity
+
+def file_read_gen(filename, csvmode = "xas"):
     if(filename[-4:] == ".ras"):
         theta, intensity = file_read_ras(filename)
     elif(filename[-4:] == ".int"):
         theta, intensity = file_read_int(filename)
+    elif(filename[-4:] == ".csv"):
+        if(csvmode == "xas"):
+            theta, intensity = file_read_xas_csv(filename)
+        elif(csvmode == "rixs"):
+            theta, intensity = file_read_rixs_csv(filename)
     return theta, intensity
         
 def plot(theta, intensity, title, color, label, spacing):
@@ -72,7 +122,7 @@ def plot(theta, intensity, title, color, label, spacing):
     ni = np.array(intensity)
     
     ax.plot(nt, ni, color = color, label = label)
-    ax.set_xlabel("2θ (degrees)")
+    ax.set_xlabel("ω (degrees)")
     ax.set_ylabel("Intensity (arb. units)")
 
     xticks1 = np.arange(theta[0], theta[len(theta)-1]+0.01, spacing/2)
@@ -88,16 +138,19 @@ def plot(theta, intensity, title, color, label, spacing):
     plt.legend()
     plt.show()
 
-def plot_gen(axes, ind, theta, intensity, title, color, label, spacing, axis_vis = True):
+def plot_gen(axes, ind, theta, intensity, title, color, label, spacing, axis_vis = True, xaxis = "ω (degrees)", yaxis = "Normalized Intensity (arb. units)"):
 
-    ax = axes[ind]
+    if hasattr(axes, "__getitem__"):
+        ax = axes[ind]
+    else:
+        ax = axes
 
     nt = np.array(theta)
     ni = np.array(intensity)
     
     ax.plot(nt, ni, color = color, label = label)
-    ax.set_xlabel("2θ (degrees)")
-    ax.set_ylabel("Normalized Intensity (arb. units)")
+    ax.set_xlabel(xaxis)
+    ax.set_ylabel(yaxis)
 
     xticks1 = np.arange(theta[0], theta[len(theta)-1]+0.01, spacing/2)
     xticks2 = np.arange(theta[0], theta[len(theta)-1]+0.01, spacing)
@@ -215,9 +268,9 @@ def plotsuper(theta, intensity, title):
 
     plt.show()
 
-def plot_peaks_gen(axes, ind, theta, peaks, spacing):
+def plot_peaks_gen(axes, ind, theta, peaks, color, spacing, xaxis = "2θ (degrees)"):
     pks = axes[ind]
-    pks.bar(peaks, 1, width = 0.02*spacing)
+    pks.bar(peaks, 1, width = 0.02*spacing, color = color)
 
     xticks1 = np.arange(theta[0], theta[len(theta)-1]+1, spacing/2)
     xticks2 = np.arange(theta[0], theta[len(theta)-1]+1, spacing)
@@ -228,7 +281,7 @@ def plot_peaks_gen(axes, ind, theta, peaks, spacing):
     pks.get_yaxis().set_visible(False)
     pks.set_xlim(theta[0], theta[len(theta)-1])
 
-    pks.set_xlabel("2θ (degrees)")
+    pks.set_xlabel(xaxis)
 
 def restrict_range(theta_r, theta_i):
     for i in range(len(theta_i)):
@@ -358,7 +411,119 @@ def plot_hahafunny2_gen(axes, ind, theta, intensity, title, color, label, spacin
 
     plot_hahafunny_gen(axes, ind, theta, haha_1, title, color, label, spacing, axis_vis)
 
-def plot_hahafunny_peaks_gen(axes, ind, theta, intensity, spacing, cutoff):
+
+def generate_hahafunny_peaks_gen(theta, intensity, cutoff):
+    haha_1 = smoothen(theta, intensity)
+    for i in range(40):
+        haha_1 = smoothen(theta, haha_1)
+
+    redshift(haha_1, intensity)
+
+    dx = ((theta[len(theta)-1]-theta[0])/10000)
+    haha_2 = np.gradient(haha_1, dx)
+    normalize(haha_2)
+
+    peaks = []
+
+    for i in range(len(haha_2)-1):
+        if((haha_2[i] >= 0) and (haha_2[i+1] < 0)):
+            peaks.append(theta[i])
+
+    actualized = []
+
+    normalize(intensity)
+    print(intensity[0])
+
+    left_cutoff = 0
+    right_cutoff = len(intensity)-1
+
+    for i in range(len(intensity)):
+        if(intensity[i] - intensity[0] > cutoff):
+            left_cutoff = i
+            break 
+
+    for i in range(len(intensity)):
+        if(intensity[len(intensity)-1-i] - intensity[0] > cutoff):
+            right_cutoff = len(intensity)-1-i
+            break
+    
+    left_cutoff_changed = False
+    right_cutoff_changed = False
+
+    for i in range(left_cutoff, 0, -1):
+        if(haha_2[i] >= 0 and haha_2[i-1] < 0):
+            left_cutoff = i
+            left_cutoff_changed = True
+            break
+
+    for i in range(right_cutoff, len(intensity)-1):
+        if(haha_2[i] >= 0 and haha_2[i-1] < 0):
+            right_cutoff = i
+            right_cutoff_changed = True
+            break
+
+    if(not left_cutoff_changed):
+        left_cutoff = int(len(theta)/8)
+
+    if(not right_cutoff_changed):
+        right_cutoff = int(7*len(theta)/8)
+
+    print(left_cutoff)
+    print(theta[left_cutoff])
+    print(right_cutoff)
+    print(theta[right_cutoff])
+
+    max_noise = -1
+    min_noise = 101
+    for i in range(left_cutoff):
+        if(haha_2[i] > max_noise):
+            max_noise = haha_2[i] #potential signal to noise usage
+        if((haha_2[i] < min_noise)):
+            min_noise = haha_2[i]
+    
+    for i in range(right_cutoff, len(intensity)-1):
+        if(haha_2[i] > max_noise):
+            max_noise = haha_2[i] #potential signal to noise usage
+        if((haha_2[i] < min_noise)):
+            min_noise = haha_2[i]
+    
+    if((abs(min_noise) > max_noise) and min_noise != 101):
+        max_noise = abs(min_noise)
+
+    if(max_noise < 7.3):
+        max_noise = 7.3
+
+    print(max_noise)
+
+    for i in range(len(peaks)):
+        if(i == 0):
+            if(len(peaks) == 1):
+                left_half = theta[0]
+                right_half  = peaks[0]/4
+            else:
+                left_half = theta[0]
+                right_half = (peaks[i]+(peaks[i+1]-peaks[i])/4)
+        elif (i == len(peaks) - 1):
+            left_half = (peaks[i] + (peaks[i-1]-peaks[i])/4)
+            right_half = theta[len(theta)-1]
+        else:
+            left_half = (peaks[i] + (peaks[i-1]-peaks[i])/4)
+            right_half = (peaks[i]+(peaks[i+1]-peaks[i])/4)
+        left_ind = int((left_half - theta[0])/(theta[1]-theta[0]))
+        right_ind = int(((right_half - theta[0])/(theta[1]-theta[0])))
+        max = haha_2[left_ind]
+        min = haha_2[left_ind]
+        for j in range(left_ind, right_ind):
+            if(haha_2[j] > max):
+                max = haha_2[j]
+            if(haha_2[j] < min):
+                min = haha_2[j]
+        if((max - min) > 2*max_noise):
+            print(max-min)
+            actualized.append(peaks[i])
+    return actualized
+
+def plot_hahafunny_peaks_gen(axes, ind, theta, intensity, color, spacing, cutoff, xaxis = "2θ (degrees)"):
 
     haha_1 = smoothen(theta, intensity)
     for i in range(40):
@@ -444,8 +609,12 @@ def plot_hahafunny_peaks_gen(axes, ind, theta, intensity, spacing, cutoff):
 
     for i in range(len(peaks)):
         if(i == 0):
-            left_half = theta[0]
-            right_half = (peaks[i]+(peaks[i+1]-peaks[i])/4)
+            if(len(peaks) == 1):
+                left_half = theta[0]
+                right_half  = peaks[0]/4
+            else:
+                left_half = theta[0]
+                right_half = (peaks[i]+(peaks[i+1]-peaks[i])/4)
         elif (i == len(peaks) - 1):
             left_half = (peaks[i] + (peaks[i-1]-peaks[i])/4)
             right_half = theta[len(theta)-1]
@@ -465,7 +634,34 @@ def plot_hahafunny_peaks_gen(axes, ind, theta, intensity, spacing, cutoff):
             print(max-min)
             actualized.append(peaks[i])
 
-    plot_peaks_gen(axes, ind, theta, actualized, spacing)
+    plot_peaks_gen(axes, ind, theta, actualized, color, spacing, xaxis = xaxis)
+    #"2θ / ω (degrees)"
+    #"2θ (degrees)"
+
+def plot_mosaicitypeaks_gen(axes, ind, theta, intensity, color, spacing):
+    change = 0
+    pastmax = 0
+    peaks = []
+    actualized = []
+    actualized_locs = generate_hahafunny_peaks_gen(theta, intensity, max(intensity)/10)
+    for val in actualized_locs:
+        for i in range(len(theta)):
+            if(theta[i] <= val and theta[i+1] > val):
+                actualized.append(intensity[i])
+    act_ind = 0
+    print(actualized)
+    for i in range(len(intensity)):
+        if act_ind < len(actualized):
+            if intensity[i] >= (actualized[act_ind]+intensity[0])/2 and change == 0:
+                change = 1
+                peaks.append(theta[i])
+            if intensity[i] == actualized[act_ind]:
+                pastmax = 1
+            elif intensity[i] <= (actualized[act_ind]+intensity[0])/2 and pastmax == 1 and change == 1:
+                change = 0
+                peaks.append(theta[i])
+                act_ind += 1
+    plot_peaks_gen(axes, ind, theta, peaks, color, spacing, xaxis = "ω (degrees)")
 
 def smoothen(theta, intensity):
     int_intensity = []
@@ -707,7 +903,7 @@ def plot_ras_gen(axes, ind, ras, title, color, label, spacing, axis_vis = True, 
 
     plot_gen(axes, ind, theta_r, intensity_r, title, color, label, spacing, axis_vis)
 
-def plot_peaks_ras_gen(axes, ind, ras, cutoff, spacing, amorphous = False):
+def plot_peaks_ras_gen(axes, ind, ras, cutoff, color, spacing, amorphous = False):
     theta_r, intensity_r = file_read_ras(ras)
     if(amorphous):
         intensity_r = rmv_bckg(theta_r, intensity_r, 11)
@@ -715,7 +911,7 @@ def plot_peaks_ras_gen(axes, ind, ras, cutoff, spacing, amorphous = False):
 
     peak_start, peak_end, peak_avg, peak_max = get_peaks_2(theta_r, intensity_r, cutoff)
 
-    plot_peaks_gen(axes, ind, theta_r, peak_max, spacing)
+    plot_peaks_gen(axes, ind, theta_r, peak_max, color, spacing)
 
 def plot_poly_ras_gen(axes, ind, ras, deg, title, color, label, spacing, axis_vis = True, amorphous = False):
     theta_r, intensity_r = file_read_ras(ras)
@@ -749,13 +945,13 @@ def plot_haha2_ras_gen(axes, ind, ras, title, color, label, spacing, axis_vis = 
 
     plot_hahafunny2_gen(axes, ind, theta_r, intensity_r, title, color, label, spacing, axis_vis)
 
-def plot_hahafunnypeaks_ras_gen(axes, ind, ras, spacing, cutoff, amorphous = False):
+def plot_hahafunnypeaks_ras_gen(axes, ind, ras, color, spacing, cutoff, amorphous = False):
     theta_r, intensity_r = file_read_ras(ras)
     if(amorphous):
         intensity_r = rmv_bckg(theta_r, intensity_r, 11)
     normalize(intensity_r)
 
-    plot_hahafunny_peaks_gen(axes, ind, theta_r, intensity_r, spacing, cutoff)
+    plot_hahafunny_peaks_gen(axes, ind, theta_r, intensity_r, color, spacing, cutoff)
 
 def custom_plot_ras(axes, ras, title, color, label, spacing, cutoff, amorphous = False):
     plot_ras_gen(axes, 0, ras, title, color, label, spacing, axis_vis = False, amorphous = amorphous)
@@ -789,40 +985,62 @@ def plot_int_gen(axes, ind, dotint, title, color, label, spacing, axis_vis = Tru
 
     plot_gen(axes, ind, theta_i, intensity_i, title, color, label, spacing, axis_vis)
 
-def plot_hahafunnypeaks_int_gen(axes, ind, dotint, spacing, cutoff):
+def plot_hahafunnypeaks_int_gen(axes, ind, dotint, color, spacing, cutoff):
     theta_i, intensity_i = file_read_int(dotint)
     normalize(intensity_i)
 
-    plot_hahafunny_peaks_gen(axes, ind, theta_i, intensity_i, spacing, cutoff)
+    plot_hahafunny_peaks_gen(axes, ind, theta_i, intensity_i, color, spacing, cutoff)
 
-def plot_file_gen(axes, ind, filename, title, color, label, spacing, offset = 0, axis_vis = True, amorphous = False):
+def plot_file_gen(axes, ind, filename, title, color, label, spacing, offset = 0, axis_vis = True, amorphous = False, norm = False, xaxis = "2θ (degrees)"):
     theta, intensity = file_read_gen(filename)
     if(amorphous):
         intensity = rmv_bckg(theta, intensity, 11)
-    normalize(intensity)
+    if(norm):
+        yaxis = "Normalized Intensity (arb. units)"
+        normalize(intensity)
+    else:
+        yaxis = "Intensity (arb. units)"
     for i in range(len(intensity)):
         intensity[i] += offset
 
-    plot_gen(axes, ind, theta, intensity, title, color, label, spacing, axis_vis)
+    plot_gen(axes, ind, theta, intensity, title, color, label, spacing, axis_vis, xaxis = xaxis, yaxis = yaxis)
 
-def plot_hahafunnypeaks_file_gen(axes, ind, filename, spacing, cutoff, amorphous = False):
+def plot_hahafunnypeaks_file_gen(axes, ind, filename, color, spacing, cutoff, amorphous = False):
     theta, intensity = file_read_gen(filename)
     if(amorphous):
         intensity = rmv_bckg(theta, intensity, 11)
     normalize(intensity)
 
-    plot_hahafunny_peaks_gen(axes, ind, theta, intensity, spacing, cutoff)
+    plot_hahafunny_peaks_gen(axes, ind, theta, intensity, color, spacing, cutoff)
 
-def custom_plot_gen(axes, filename, title, color, label, spacing, cutoff, offset = 0, amorphous = False):
-    plot_file_gen(axes, 0, filename, title, color, label, spacing, offset, axis_vis = False, amorphous = amorphous)
-    plot_hahafunnypeaks_file_gen(axes, 1, filename, spacing, cutoff, amorphous = amorphous)
+def plot_mosaicitypeaks_file_gen(axes, ind, filename, color, spacing, cutoff, amorphous = False):
+    theta, intensity = file_read_gen(filename)
+    if(amorphous):
+        intensity = rmv_bckg(theta, intensity, 11)
+
+    plot_mosaicitypeaks_gen(axes, ind, theta, intensity, color, spacing)
+
+def custom_plot_gen(axes, filename, title, color, label, spacing, cutoff, offset = 0, amorphous = False, norm = False, xaxis = "2θ (degrees)"):
+    plot_file_gen(axes, 0, filename, title, color, label, spacing, offset, axis_vis = False, amorphous = amorphous, norm = norm)
+    plot_hahafunnypeaks_file_gen(axes, 1, filename, color, spacing, cutoff, amorphous = amorphous)
+    plt.subplots_adjust(hspace = 0.0)
+
+def custom_xas_gen(axes, filename, title, color, label, spacing, cutoff, offset = 0, amorphous = False, norm = False, xaxis = "2θ (degrees)"):
+    plot_file_gen(axes, 0, filename, title, color, label, spacing, offset, axis_vis = True, amorphous = amorphous, norm = norm, xaxis = xaxis)
+
+def plot_mosaicity_file_gen(axes, filename, title, color, label, spacing, cutoff, offset = 0, amorphous = False, norm = False):
+    plot_file_gen(axes, 0, filename, title, color, label, spacing, offset, axis_vis = False, amorphous = amorphous, norm = norm)
+    plot_mosaicitypeaks_file_gen(axes, 1, filename, color, spacing, cutoff, amorphous = amorphous)
     plt.subplots_adjust(hspace = 0.0)
 
 def log(intensity):
     for i in range(len(intensity)):
-        intensity[i] = math.log(intensity[i])
+        if(intensity[i] > 1):
+            intensity[i] = math.log(intensity[i])
+        else:
+            intensity[i] = 0
 
-def color_map(fig, axes, plots, plot_ind, files, cmapys, title, ylabel, logsc = False):
+def color_map(fig, axes, plots, plot_ind, files, cmapys, title, ylabel, xlabel = "2θ (degrees)", logsc = False):
     theta = []
     intensity = []
     t = []
@@ -839,9 +1057,24 @@ def color_map(fig, axes, plots, plot_ind, files, cmapys, title, ylabel, logsc = 
     
     mesh = axes.pcolormesh(theta, t, intensity)
     fig.colorbar(mesh)
-    axes.set_xlabel("2θ (degrees)")
+    axes.set_xlabel(xlabel)
     axes.set_ylabel(ylabel)
     axes.set_title(title)
+
+def color_map_rixs(fig, axes, plots, plot_ind, files, cmapys, title, ylabel, xlabel = "Incoming Energy (eV)", logsc = False):
+    theta = []
+    intensity = []
+    if(len(plots[plot_ind]) > 0):
+        theta, intensity = file_read_gen(files[plots[plot_ind][0]], csvmode = "rixs") 
+
+        in_energy = theta
+        out_energy = intensity.pop()
+        
+        mesh = axes.pcolormesh(in_energy, out_energy, intensity)
+        fig.colorbar(mesh)
+        axes.set_xlabel(xlabel)
+        axes.set_ylabel(ylabel)
+        axes.set_title(title)
     
 
 

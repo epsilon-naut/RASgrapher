@@ -21,6 +21,9 @@ class MplCanvas(FigureCanvas):
         self.fig.clear()
         self.axes = self.fig.add_subplot(111)
 
+    def xas(self):
+        self.fig.clear()
+        self.axes = self.fig.add_subplot(111)
 
     def normalxrd(self):
         self.fig.clear()
@@ -57,14 +60,17 @@ class mainWindow(QMainWindow):
         self.right = 1
         self.spacing = 0.2
         self.cutoff = 15
-        self.title = "XRD Results"
-        self.label = "XRD Results"
+        self.title = "Arbitrary Title"
+        self.label = "Arbitrary Label"
         self.amorphous = False
         self.color = "Blue"
         self.offset = 0
         self.cmapy = 1
         self.log = False
         self.cmaplabel = "Measurement"
+        self.cmapxlabel = "2θ (degrees)"
+        self.norm = False
+        self.csvmode = "xas"
 
         self.sc = MplCanvas(self)
 
@@ -95,6 +101,7 @@ class mainWindow(QMainWindow):
 
         cmapylayout = QHBoxLayout()
         cmaplabellayout = QHBoxLayout()
+        cmapxlabellayout = QHBoxLayout()
 
         self.addplot = QPushButton("Add Plot", self)
         self.addplot.clicked.connect(self.addPlot)
@@ -153,13 +160,20 @@ class mainWindow(QMainWindow):
         self.cmapYlabel = QLabel("Set Color Map Y: ")
         self.setcmapY = QLineEdit(f"{self.display_ind}")
         self.setcmapY.returnPressed.connect(self.updateCMapY)
-        self.cmaplabellabel = QLabel("Set Color Map Label: ")
+        self.cmaplabellabel = QLabel("Set Color Map Y Label: ")
         self.setcmaplabel = QLineEdit(f"{self.cmaplabel}")
         self.setcmaplabel.returnPressed.connect(self.updateCMapLabel)
+        self.cmapxlabellabel = QLabel("Set Color Map X Label: ")
+        self.setcmapxlabel = QLineEdit(f"{self.cmapxlabel}")
+        self.setcmapxlabel.returnPressed.connect(self.updateCMapXLabel)
         self.plotchoice = QComboBox()
-        self.plotchoice.addItem("XRD Graph")
+        self.plotchoice.addItem("XRD Graph, Unnormalized")
+        self.plotchoice.addItem("XRD Graph, Normalized")
         self.plotchoice.addItem("Colormap, Regular Scale")
         self.plotchoice.addItem("Colormap, Log Scale")
+        self.plotchoice.addItem("Mosaicity")
+        self.plotchoice.addItem("XAS, Normalized")
+        self.plotchoice.addItem("RIXS Map")        
         self.plotchoice.setCurrentIndex(0)
         self.plotchoice.currentIndexChanged.connect(self.updateGraph)
         self.save = QPushButton("Save", self)
@@ -233,6 +247,9 @@ class mainWindow(QMainWindow):
 
         cmaplabellayout.addWidget(self.cmaplabellabel)
         cmaplabellayout.addWidget(self.setcmaplabel)
+
+        cmapxlabellayout.addWidget(self.cmapxlabellabel)
+        cmapxlabellayout.addWidget(self.setcmapxlabel)
         
         slayout.addLayout(axeslayout)
         slayout.addLayout(toolslayout)
@@ -240,6 +257,7 @@ class mainWindow(QMainWindow):
         slayout.addWidget(self.animate)
         slayout.addLayout(cmapylayout)
         slayout.addLayout(cmaplabellayout)
+        slayout.addLayout(cmapxlabellayout)
         slayout.addWidget(self.plotchoice)
         slayout.addWidget(self.save)
                 
@@ -281,7 +299,7 @@ class mainWindow(QMainWindow):
                 self.cmapy = self.display_ind
                 self.cmapys[self.plot_ind].append(self.cmapy)
                 self.plots[self.plot_ind].append(self.cur_ind)
-                theta, intensity = rg.file_read_gen(self.files[self.cur_ind])
+                theta, intensity = rg.file_read_gen(self.files[self.cur_ind], self.csvmode)
                 self.left = theta[0]
                 self.right = theta[len(theta)-1]
                 self.axes[self.plot_ind] = [self.left, self.right]
@@ -353,18 +371,31 @@ class mainWindow(QMainWindow):
 
     def updateGraph(self):
         print(self.plotchoice.currentIndex())
-        if(self.plotchoice.currentIndex() == 0):
+        if(self.plotchoice.currentIndex() < 2):
             self.updateXRD()
-        elif(self.plotchoice.currentIndex() == 1):
+        elif(self.plotchoice.currentIndex() == 2):
             self.log = False
             self.updateCMap()
-        else:
+        elif(self.plotchoice.currentIndex() == 3):
             self.log = True
             self.updateCMap()
+        elif(self.plotchoice.currentIndex() == 4):
+            self.updateMosaicity()
+        elif(self.plotchoice.currentIndex() == 5):
+            self.csvmode = "xas"
+            self.updateXAS()
+        elif(self.plotchoice.currentIndex() == 6):
+            self.csvmode = "rixs"
+            self.updateRIXSMap()
 
     def updateXRD(self):
+        if(self.plotchoice.currentIndex() == 0):
+            self.norm = False
+        else:
+            self.norm = True
         self.sc.normalxrd()
         print(len(self.plots[self.plot_ind]))
+        print(self.norm)
         for i in range(len(self.plots[self.plot_ind])):
             self.cur_ind = self.plots[self.plot_ind][i]
             self.nohahaGraph()
@@ -374,7 +405,7 @@ class mainWindow(QMainWindow):
         rg.change_axes(self.sc.axes, self.axes[self.plot_ind], self.spacing)
 
     def nohahaGraph(self):
-        rg.custom_plot_gen(self.sc.axes, self.files[self.cur_ind], self.titles[self.cur_ind], self.colors[self.cur_ind], self.labels[self.cur_ind], self.spacings[self.plot_ind], self.cutoffs[self.cur_ind], offset = self.offsets[self.cur_ind], amorphous = self.amorphs[self.cur_ind])
+        rg.custom_plot_gen(self.sc.axes, self.files[self.cur_ind], self.titles[self.cur_ind], self.colors[self.cur_ind], self.labels[self.cur_ind], self.spacings[self.plot_ind], self.cutoffs[self.cur_ind], offset = self.offsets[self.cur_ind], amorphous = self.amorphs[self.cur_ind], norm = self.norm)
         #rg.custom_smro_plot_ras(self.files[self.cur_ind], self.cutoff, self.spacing, self.sc.axes)
         
         self.sc.draw_idle() 
@@ -414,10 +445,10 @@ class mainWindow(QMainWindow):
         self.setspace.setText(f"{self.spacing}")
         self.setcutoff.setText(f"{self.cutoff}")
         self.setcmapY.setText(f"{self.cmapy}")
-        if (len(self.files[self.cur_ind]) > 30):
-            self.filename.setText("Current File: ..." + self.files[self.line_ind][-30:])
+        if (len(self.files[self.plots[self.plot_ind][self.line_ind]]) > 30):
+            self.filename.setText("Current File: ..." + self.files[self.plots[self.plot_ind][self.line_ind]][-30:])
         else:
-            self.filename.setText("Current File: " + self.files[self.line_ind])
+            self.filename.setText("Current File: " + self.files[self.plots[self.plot_ind][self.line_ind]])
         self.update()
 
     def updateAxes(self):
@@ -435,13 +466,37 @@ class mainWindow(QMainWindow):
 
     def updateCMap(self):
         self.sc.colormap()
-        rg.color_map(self.sc.fig, self.sc.axes, self.plots, self.plot_ind, self.files, self.cmapys, self.title, self.cmaplabel, self.log)
+        rg.color_map(self.sc.fig, self.sc.axes, self.plots, self.plot_ind, self.files, self.cmapys, self.title, self.cmaplabel, self.cmapxlabel, self.log)
         self.sc.draw_idle() 
 
     def updateCMapLabel(self):
         self.cmaplabel = self.setcmaplabel.text()
         self.updateGraph()
-    
+
+    def updateCMapXLabel(self):
+        self.cmapxlabel = self.setcmapxlabel.text()
+        self.updateGraph()
+
+    def updateMosaicity(self):
+        self.sc.normalxrd()
+        for i in range(len(self.plots[self.plot_ind])):
+            self.cur_ind = self.plots[self.plot_ind][i]
+            rg.plot_mosaicity_file_gen(self.sc.axes, self.files[self.cur_ind], self.titles[self.cur_ind], self.colors[self.cur_ind], self.labels[self.cur_ind], self.spacings[self.plot_ind], self.cutoffs[self.cur_ind], offset = self.offsets[self.cur_ind], amorphous = self.amorphs[self.cur_ind], norm = self.norm)
+            self.sc.draw_idle()
+        rg.change_axes(self.sc.axes, self.axes[self.plot_ind], self.spacing)
+
+    def updateXAS(self):
+        self.sc.xas()
+        for i in range(len(self.plots[self.plot_ind])):
+            self.cur_ind = self.plots[self.plot_ind][i]
+            rg.custom_xas_gen(self.sc.axes, self.files[self.cur_ind], self.titles[self.cur_ind], self.colors[self.cur_ind], self.labels[self.cur_ind], self.spacings[self.plot_ind], self.cutoffs[self.cur_ind], offset = self.offsets[self.cur_ind], amorphous = self.amorphs[self.cur_ind], norm = self.norm, xaxis = "Energy (eV)")
+        self.sc.draw_idle()
+
+    def updateRIXSMap(self):
+        self.sc.colormap()
+        rg.color_map_rixs(self.sc.fig, self.sc.axes, self.plots, self.plot_ind, self.files, self.cmapys, self.title, self.cmaplabel, self.cmapxlabel, self.log)
+        self.sc.draw_idle() 
+
 window = mainWindow()
 window.show()
 
