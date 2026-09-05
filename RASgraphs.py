@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib.colors as clr
 import numpy as np
 import matplotlib.animation as anim
 import math
@@ -167,7 +168,17 @@ def plot_gen(axes, ind, theta, intensity, title, color, label, spacing, axis_vis
     ax.legend()
 
 def change_axes(axes, theta, spacing):
-    for ax in axes:
+    if hasattr(axes, "__getitem__"):
+        for ax in axes:
+            xticks1 = np.arange(theta[0], theta[len(theta)-1]+0.01, spacing/2)
+            xticks2 = np.arange(theta[0], theta[len(theta)-1]+0.01, spacing)
+            ax.set_xlim(theta[0], theta[len(theta)-1])
+            ax.set_xticks(xticks1, minor = True)
+            ax.set_xticks(xticks2)
+            ax.tick_params(which = "minor", length = 5)
+            ax.tick_params(which = "major", length = 8)
+    else:
+        ax = axes
         xticks1 = np.arange(theta[0], theta[len(theta)-1]+0.01, spacing/2)
         xticks2 = np.arange(theta[0], theta[len(theta)-1]+0.01, spacing)
         ax.set_xlim(theta[0], theta[len(theta)-1])
@@ -175,6 +186,27 @@ def change_axes(axes, theta, spacing):
         ax.set_xticks(xticks2)
         ax.tick_params(which = "minor", length = 5)
         ax.tick_params(which = "major", length = 8)
+
+def change_y(axes, theta, spacing):
+    if hasattr(axes, "__getitem__"):
+        for ax in axes:
+            yticks1 = np.arange(theta[0], theta[len(theta)-1]+0.01, spacing/2)
+            yticks2 = np.arange(theta[0], theta[len(theta)-1]+0.01, spacing)
+            ax.set_ylim(theta[0], theta[len(theta)-1])
+            ax.set_yticks(yticks1, minor = True)
+            ax.set_yticks(yticks2)
+            ax.tick_params(which = "minor", length = 5)
+            ax.tick_params(which = "major", length = 8)
+    else:
+        ax = axes
+        yticks1 = np.arange(theta[0], theta[len(theta)-1]+0.01, spacing/2)
+        yticks2 = np.arange(theta[0], theta[len(theta)-1]+0.01, spacing)
+        ax.set_ylim(theta[0], theta[len(theta)-1])
+        ax.set_yticks(yticks1, minor = True)
+        ax.set_yticks(yticks2)
+        ax.tick_params(which = "minor", length = 5)
+        ax.tick_params(which = "major", length = 8)
+    
 
 def plotn(n, theta, intensity, title, color, label, spacing):
 
@@ -1061,32 +1093,109 @@ def color_map(fig, axes, plots, plot_ind, files, cmapys, title, ylabel, xlabel =
     axes.set_ylabel(ylabel)
     axes.set_title(title)
 
-def color_map_rixs(fig, axes, plots, plot_ind, files, cmapys, title, ylabel, xlabel = "Incoming Energy (eV)", logsc = False):
+def color_map_rixs(fig, axes, plots, plot_ind, files, transfer_bounds, vmins, vmaxs, title, ylabel, xlabel = "Incoming Energy (eV)", logsc = False):
     theta = []
     intensity = []
+    axis_left = 0
+    axis_right = 1
+    out_energy = [0, 1]
     if(len(plots[plot_ind]) > 0):
         theta, intensity = file_read_gen(files[plots[plot_ind][0]], csvmode = "rixs") 
 
         in_energy = theta
         out_energy = intensity.pop()
+
+        in_energy, out_energy, intensity = rixsify(in_energy, out_energy, intensity, transfer_bounds[plots[plot_ind][0]])
         
-        mesh = axes.pcolormesh(in_energy, out_energy, intensity)
-        fig.colorbar(mesh)
+        norm = clr.Normalize(vmin=vmins[plot_ind], vmax=vmaxs[plot_ind])
+        mesh = axes.pcolormesh(in_energy, out_energy, intensity, norm=norm)
+        axis_left = in_energy[0]
+        axis_right = in_energy[-1]
+        fig.colorbar(mesh, norm=norm)
         axes.set_xlabel(xlabel)
         axes.set_ylabel(ylabel)
         axes.set_title(title)
+
+    return axis_left, axis_right, out_energy
+
+def rixsify(in_energy, out_energy, intensity, transfer_bound):
+    
+    # assumption is that the energies are distributed evenly
+    diff = len(in_energy) - 1
+    new_int = []
+    slope = ((in_energy[-1]-in_energy[0])*len(out_energy))/((out_energy[-1]-out_energy[0])*len(in_energy))
+    print(slope)
+
+    if transfer_bound != "def":
+        top_energy = in_energy[0] - float(transfer_bound)
+    else:
+        ind = int(len(out_energy) - 1 - diff*slope)
+        top_energy = out_energy[ind]
+
+    for i in range(len(out_energy)):
+        if out_energy[i] <= top_energy and out_energy[i+1] > top_energy:
+            ind = i
+
+    if ind <= int(len(out_energy) - 1 - diff*slope):
+        max_bounds = len(in_energy)
+    else:
+        max_bounds = int((len(out_energy) - ind) / slope) 
+    for i in range(max_bounds):
+        blk = []
+        for j in range(ind, 0, -1):
+            k = j+int(i*slope) 
+            blk.append(intensity[k][i])
+        new_int.append(blk)
+    transfer = []
+    for j in range(ind, 0, -1):
+        transfer.append((out_energy[j] - in_energy[0]) * -1)
+
+    return transfer, in_energy[:max_bounds], new_int
+
+def rixs_cut(axes, plots, plot_ind, files, desired_energy, transfer_bounds, title, color, label, spacing, offset = 0, axis_vis = True, amorphous = False, norm = False, xaxis = "Energy Transfer (eV)"):
+    
+    if(len(plots[plot_ind]) > 0):
+        theta, intensity = file_read_gen(files[plots[plot_ind][0]], csvmode = "rixs") 
+
+        in_energy = theta
+        out_energy = intensity.pop()
+
+        in_energy, out_energy, intensity = rixsify(in_energy, out_energy, intensity, transfer_bounds[plots[plot_ind][0]])
+    
+    print(desired_energy)
+
+    for i in range(len(out_energy)):
+        if(out_energy[i] <= desired_energy and out_energy[i+1] > desired_energy):
+            desired_index = i
+
+    cut_intensity = []
+    for i in range(len(intensity[desired_index])):
+        cut_intensity.append(intensity[desired_index][i])
+
+    if(norm):
+        yaxis = "Normalized Intensity (arb. units)"
+        normalize(cut_intensity)
+    else:
+        yaxis = "Intensity (arb. units)"
+    for i in range(len(cut_intensity)):
+        cut_intensity[i] += offset
+
+    plot_gen(axes, 0, in_energy, cut_intensity, title, color, label, spacing, axis_vis, xaxis = xaxis, yaxis = yaxis)
+
     
 
 
 
 
+
 if __name__ == "__main__":
+    pass
     #plot_ras_int_comp("YBCO_annealedOfurnace_20260113_1p5dpm_SIDEA.ras", "test3.int", 20, 3)
     #plot_poly("YBCO_annealedOfurnace_20260113_1p5dpm_SIDEA.ras", 11)
     #plot_ras("C:/Users/Jeff/Documents/Research/XRD/SMRO/2026-01-14/SMRO_19-1_204_omega_correct_Ka1.ras", "SMRO", "blue", "SMRO", 1)
     #plot_ras_int_comp_2("C:/Users/Jeff/Documents/Research/XRD/SMRO/2026-01-14/SMRO_19-1_204_omega_correct_Ka1.ras", "C:/Users/Jeff/Documents/Research/XRD/SMRO/Sr2MgReO6_COD.int", "SMRO vs CIF", ["blue", "black"], ["SMRO", "VESTA"], 1)
-    plot_comparison("C:/Users/Jeff/Documents/Research/XRD/SMRO/2026-01-14/SMRO_19-1_204_omega_correct_Ka1.ras", 5, 10, 1)
-    plot_comparison("C:/Users/Jeff/Documents/Research/XRD/SMRO/2026-01-14/Post Temp Loop/SMRO_19-1_204_omega_Ka1_postheatloop.ras", 5, 10, 1)
-    plot_comparison("C:/Users/Jeff/Documents/Research/XRD/SMRO/2026-01-14/Temp Loop/RAS/SMRO_19-1_204_CuKa1_2theta-scan_25_0025_0175-0C.ras", 5, 10, 1)
+    #plot_comparison("C:/Users/Jeff/Documents/Research/XRD/SMRO/2026-01-14/SMRO_19-1_204_omega_correct_Ka1.ras", 5, 10, 1)
+    #plot_comparison("C:/Users/Jeff/Documents/Research/XRD/SMRO/2026-01-14/Post Temp Loop/SMRO_19-1_204_omega_Ka1_postheatloop.ras", 5, 10, 1)
+    #plot_comparison("C:/Users/Jeff/Documents/Research/XRD/SMRO/2026-01-14/Temp Loop/RAS/SMRO_19-1_204_CuKa1_2theta-scan_25_0025_0175-0C.ras", 5, 10, 1)
 
     

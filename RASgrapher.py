@@ -51,6 +51,12 @@ class mainWindow(QMainWindow):
         self.axes = [[0, 1]]
         self.offsets = []
         self.cmapys = [[]]
+        self.lefts = [0]
+        self.rights = [1]
+        self.vmins = [0]
+        self.vmaxs = [1]
+        self.rixs_y_bounds = [[0, 1]]
+        self.y_spacings = [0.2]
 
         self.plot_ind = 0
         self.cur_ind = 0
@@ -63,14 +69,18 @@ class mainWindow(QMainWindow):
         self.title = "Arbitrary Title"
         self.label = "Arbitrary Label"
         self.amorphous = False
-        self.color = "Blue"
+        self.color = "C0"
         self.offset = 0
         self.cmapy = 1
         self.log = False
         self.cmaplabel = "Measurement"
         self.cmapxlabel = "2θ (degrees)"
+        self.rixscut = 0
+        self.rixsbound = "def"
+        self.rixsbounds = [self.rixsbound]
         self.norm = False
         self.csvmode = "xas"
+        self.last = [-1]
 
         self.sc = MplCanvas(self)
 
@@ -83,7 +93,8 @@ class mainWindow(QMainWindow):
         clrlayout = QHBoxLayout()
         amlayout = QHBoxLayout()
 
-        lrlayout = QVBoxLayout()
+        leftlayout = QHBoxLayout()
+        rightlayout = QHBoxLayout()
         splayout = QHBoxLayout()
         axeslayout = QVBoxLayout()
 
@@ -102,6 +113,16 @@ class mainWindow(QMainWindow):
         cmapylayout = QHBoxLayout()
         cmaplabellayout = QHBoxLayout()
         cmapxlabellayout = QHBoxLayout()
+
+        rixscutlayout = QHBoxLayout()
+        rixsboundlayout = QHBoxLayout()
+
+        vminlayout = QHBoxLayout()
+        vmaxlayout = QHBoxLayout()
+
+        rixsybotlayout = QHBoxLayout()
+        rixsyboundlayout = QHBoxLayout()
+        rixsyspacinglayout = QHBoxLayout()
 
         self.addplot = QPushButton("Add Plot", self)
         self.addplot.clicked.connect(self.addPlot)
@@ -166,6 +187,27 @@ class mainWindow(QMainWindow):
         self.cmapxlabellabel = QLabel("Set Color Map X Label: ")
         self.setcmapxlabel = QLineEdit(f"{self.cmapxlabel}")
         self.setcmapxlabel.returnPressed.connect(self.updateCMapXLabel)
+        self.rixsmapcutlabel = QLabel("Set RIXS Map Cut Energy: ")
+        self.rixsmapcut = QLineEdit(f"{self.rixscut}")
+        self.rixsmapcut.returnPressed.connect(self.updateRIXSCutEngy)
+        self.rixsmapboundlabel = QLabel("Set RIXS Map Lower Transfer Energy: ")
+        self.rixsmapbound = QLineEdit(f"{self.rixsbound}")
+        self.rixsmapbound.returnPressed.connect(self.updateRIXSUpperBoundEngy)
+        self.vminlabel = QLabel("Set RIXS Vmin: ")
+        self.rixsvmin = QLineEdit(f"{self.vmins[0]}", self)
+        self.rixsvmin.returnPressed.connect(self.updateRIXSNorm)
+        self.vmaxlabel = QLabel("Set RIXS Vmax: ")
+        self.rixsvmax = QLineEdit(f"{self.vmaxs[0]}", self)
+        self.rixsvmax.returnPressed.connect(self.updateRIXSNorm)
+        self.rixsylabel = QLabel("Set RIXS Y Upper Bound: ")
+        self.rixsy = QLineEdit(f"{self.rixs_y_bounds[0][1]}", self)
+        self.rixsy.returnPressed.connect(self.updateRIXSTop)
+        self.rixsybotlabel = QLabel("Set RIXS Y Lower Bound: ")
+        self.rixsybot = QLineEdit(f"{self.rixs_y_bounds[0][0]}", self)
+        self.rixsybot.returnPressed.connect(self.updateRIXSTop)
+        self.rixsyspacinglabel = QLabel("Set RIXS Y Spacing: ")
+        self.rixsyspacingedit = QLineEdit(f"{self.y_spacings[0]}", self)
+        self.rixsyspacingedit.returnPressed.connect(self.updateRIXSYSpacing)
         self.plotchoice = QComboBox()
         self.plotchoice.addItem("XRD Graph, Unnormalized")
         self.plotchoice.addItem("XRD Graph, Normalized")
@@ -174,6 +216,7 @@ class mainWindow(QMainWindow):
         self.plotchoice.addItem("Mosaicity")
         self.plotchoice.addItem("XAS, Normalized")
         self.plotchoice.addItem("RIXS Map")        
+        self.plotchoice.addItem("RIXS Cut")
         self.plotchoice.setCurrentIndex(0)
         self.plotchoice.currentIndexChanged.connect(self.updateGraph)
         self.save = QPushButton("Save", self)
@@ -224,11 +267,13 @@ class mainWindow(QMainWindow):
         splayout.addWidget(self.setspace)
         axeslayout.addLayout(splayout)
 
-        lrlayout.addWidget(self.leftlabel)
-        lrlayout.addWidget(self.axisleft)
-        lrlayout.addWidget(self.rightlabel)
-        lrlayout.addWidget(self.axisright)
-        axeslayout.addLayout(lrlayout)
+        leftlayout.addWidget(self.leftlabel)
+        leftlayout.addWidget(self.axisleft)
+        axeslayout.addLayout(leftlayout)
+        
+        rightlayout.addWidget(self.rightlabel)
+        rightlayout.addWidget(self.axisright)
+        axeslayout.addLayout(rightlayout)
         
         ctlayout.addWidget(self.cutofflabel)
         ctlayout.addWidget(self.setcutoff)
@@ -250,6 +295,27 @@ class mainWindow(QMainWindow):
 
         cmapxlabellayout.addWidget(self.cmapxlabellabel)
         cmapxlabellayout.addWidget(self.setcmapxlabel)
+
+        rixscutlayout.addWidget(self.rixsmapcutlabel)
+        rixscutlayout.addWidget(self.rixsmapcut)
+
+        rixsboundlayout.addWidget(self.rixsmapboundlabel)
+        rixsboundlayout.addWidget(self.rixsmapbound)
+
+        vminlayout.addWidget(self.vminlabel)
+        vminlayout.addWidget(self.rixsvmin)
+
+        vmaxlayout.addWidget(self.vmaxlabel)
+        vmaxlayout.addWidget(self.rixsvmax)
+
+        rixsybotlayout.addWidget(self.rixsybotlabel)
+        rixsybotlayout.addWidget(self.rixsybot)
+
+        rixsyboundlayout.addWidget(self.rixsylabel)
+        rixsyboundlayout.addWidget(self.rixsy)
+
+        rixsyspacinglayout.addWidget(self.rixsyspacinglabel)
+        rixsyspacinglayout.addWidget(self.rixsyspacingedit)
         
         slayout.addLayout(axeslayout)
         slayout.addLayout(toolslayout)
@@ -258,6 +324,7 @@ class mainWindow(QMainWindow):
         slayout.addLayout(cmapylayout)
         slayout.addLayout(cmaplabellayout)
         slayout.addLayout(cmapxlabellayout)
+
         slayout.addWidget(self.plotchoice)
         slayout.addWidget(self.save)
                 
@@ -270,6 +337,14 @@ class mainWindow(QMainWindow):
         self.axes.append([0, 1])
         self.spacings.append(0.2)
         self.cmapys.append([])
+        self.last.append(-1)
+        self.lefts.append(0)
+        self.rights.append(1)
+        self.vmins.append(0)
+        self.vmaxs.append(1)
+        self.rixsbounds.append(self.rixsbound)
+        self.rixs_y_bounds.append([0, 1])
+        self.y_spacings.append(0.2)
         self.left = 0
         self.right = 1
         self.spacing = 0.2
@@ -292,17 +367,31 @@ class mainWindow(QMainWindow):
                 self.titles.append(self.title)
                 self.labels.append(self.label)
                 self.amorphs.append(self.amorphous)
-                self.colors.append(self.color)
                 self.cur_ind = len(self.files)-1
                 self.line_ind = len(self.plots[self.plot_ind])
+                self.colors.append(f"C{self.line_ind}")
                 self.display_ind = self.line_ind + 1
                 self.cmapy = self.display_ind
                 self.cmapys[self.plot_ind].append(self.cmapy)
                 self.plots[self.plot_ind].append(self.cur_ind)
                 theta, intensity = rg.file_read_gen(self.files[self.cur_ind], self.csvmode)
+                if(self.csvmode == "rixs"):
+                    mins = []
+                    maxs = []
+                    for i in range(len(intensity)-1):
+                        mins.append(min(intensity[i]))
+                        maxs.append(max(intensity[i]))
+                    print(min(mins))
+                    print(maxs)
+                    self.vmins[self.plot_ind] = min(mins)
+                    self.vmaxs[self.plot_ind] = max(maxs)
+                self.lefts[self.plot_ind] = theta[0]
+                self.rights[self.plot_ind] = theta[-1]
                 self.left = theta[0]
                 self.right = theta[len(theta)-1]
-                self.axes[self.plot_ind] = [self.left, self.right]
+                self.lefts[self.plot_ind] = self.left
+                self.rights[self.plot_ind] = self.right
+                self.axes[self.plot_ind] = [self.lefts[self.plot_ind], self.rights[self.plot_ind]]
                 print(self.cur_ind)
                 print("Selected File:", self.files[self.cur_ind])
             self.updateLabels()
@@ -387,6 +476,8 @@ class mainWindow(QMainWindow):
         elif(self.plotchoice.currentIndex() == 6):
             self.csvmode = "rixs"
             self.updateRIXSMap()
+        elif(self.plotchoice.currentIndex() == 7):
+            self.updateRIXSCut()
 
     def updateXRD(self):
         if(self.plotchoice.currentIndex() == 0):
@@ -437,14 +528,18 @@ class mainWindow(QMainWindow):
         self.amorphous = self.amorphs[self.plots[self.plot_ind][self.line_ind]]
         self.color = self.colors[self.plots[self.plot_ind][self.line_ind]]
         self.cmapy = self.cmapys[self.plot_ind][self.line_ind]
-        self.axisleft.setText(f"{self.left}")
-        self.axisright.setText(f"{self.right}")
+        self.rixsbound = self.rixsbounds[self.plot_ind]
+        self.axisleft.setText(f"{self.lefts[self.plot_ind]}")
+        self.axisright.setText(f"{self.rights[self.plot_ind]}")
         self.chooseline.setText(f"{self.display_ind}")
         self.settitle.setText(self.title)
         self.setlabel.setText(self.label)
         self.setspace.setText(f"{self.spacing}")
         self.setcutoff.setText(f"{self.cutoff}")
         self.setcmapY.setText(f"{self.cmapy}")
+        self.setcmaplabel.setText(f"{self.cmaplabel}")
+        self.setcmapxlabel.setText(f"{self.cmapxlabel}")
+        self.rixsmapbound.setText(f"{self.rixsbound}")
         if (len(self.files[self.plots[self.plot_ind][self.line_ind]]) > 30):
             self.filename.setText("Current File: ..." + self.files[self.plots[self.plot_ind][self.line_ind]][-30:])
         else:
@@ -454,7 +549,9 @@ class mainWindow(QMainWindow):
     def updateAxes(self):
         self.left = float(self.axisleft.text())
         self.right = float(self.axisright.text())
-        new_axes = [self.left, self.right]
+        self.lefts[self.plot_ind] = self.left
+        self.rights[self.plot_ind] = self.right
+        new_axes = [self.lefts[self.plot_ind], self.rights[self.plot_ind]]
         self.axes[self.plot_ind] = new_axes
         rg.change_axes(self.sc.axes, new_axes, self.spacing)
         self.sc.draw_idle()
@@ -494,8 +591,75 @@ class mainWindow(QMainWindow):
 
     def updateRIXSMap(self):
         self.sc.colormap()
-        rg.color_map_rixs(self.sc.fig, self.sc.axes, self.plots, self.plot_ind, self.files, self.cmapys, self.title, self.cmaplabel, self.cmapxlabel, self.log)
+        
+        if(len(self.plots[self.plot_ind]) > 0):
+            if(self.last[self.plot_ind] != self.files[self.plots[self.plot_ind][0]]):
+                self.left, self.right, in_energy = rg.color_map_rixs(self.sc.fig, self.sc.axes, self.plots, self.plot_ind, self.files, self.rixsbounds, self.vmins, self.vmaxs, self.title, self.cmaplabel, self.cmapxlabel, self.log)
+                self.spacing = (self.right - self.left)/5 
+                self.y_spacings[self.plot_ind] = (in_energy[-1] - in_energy[0])/5
+                self.lefts[self.plot_ind] = self.left 
+                self.rights[self.plot_ind] = self.right
+                new_axes = [self.lefts[self.plot_ind], self.rights[self.plot_ind]]
+                self.axes[self.plot_ind] = new_axes
+                self.rixs_y_bounds[self.plot_ind] = [in_energy[0], in_energy[-1]]
+
+            else:
+                rg.color_map_rixs(self.sc.fig, self.sc.axes, self.plots, self.plot_ind, self.files, self.rixsbounds, self.vmins, self.vmaxs, self.title, self.cmaplabel, self.cmapxlabel, self.log)
+            self.last[self.plot_ind] = self.files[self.plots[self.plot_ind][0]]
+        else:
+            rg.color_map_rixs(self.sc.fig, self.sc.axes, self.plots, self.plot_ind, self.files, self.rixsbounds, self.vmins, self.vmaxs, self.title, self.cmaplabel, self.cmapxlabel, self.log)
+
+        rg.change_axes(self.sc.axes, self.axes[self.plot_ind], self.spacing)
+        rg.change_y(self.sc.axes, self.rixs_y_bounds[self.plot_ind], self.y_spacings[self.plot_ind])
+
+        self.axisleft.setText(f"{self.lefts[self.plot_ind]}")
+        self.axisright.setText(f"{self.rights[self.plot_ind]}")
+
+        self.cmaplabel = "Incident Energy (eV)"
+        self.cmapxlabel = "Energy Loss (eV)"
+
         self.sc.draw_idle() 
+
+    def is_floatable(self):
+        try:
+            float(str(self.rixsbound))
+            return True
+        except ValueError:
+            return False
+
+    def updateRIXSUpperBoundEngy(self):
+        self.rixsbound = self.rixsmapbound.text()
+        self.rixsbounds[self.plots[self.plot_ind][0]] = self.rixsbound
+        if(self.is_floatable()):
+            if(float(str(self.rixsbound)) < self.lefts[self.plot_ind]):
+                self.left = float(str(self.rixsbound))
+                self.lefts[self.plot_ind] = self.left
+                self.axes[self.plot_ind] = [self.lefts[self.plot_ind], self.rights[self.plot_ind]]
+        self.updateGraph()
+
+    def updateRIXSCutEngy(self):
+        self.rixscut = float(self.rixsmapcut.text())
+        self.updateGraph()
+
+    def updateRIXSCut(self):
+        self.sc.xas()
+        self.cur_ind = self.plots[self.plot_ind][0]
+        rg.rixs_cut(self.sc.axes, self.plots, self.plot_ind, self.files, self.rixscut, self.rixsbounds, self.titles[self.cur_ind], self.colors[self.cur_ind], self.labels[self.cur_ind], self.spacings[self.plot_ind], offset = self.offsets[self.cur_ind], amorphous = self.amorphs[self.cur_ind], norm = self.norm, xaxis = "Energy (eV)")
+        self.sc.draw_idle()
+
+    def updateRIXSNorm(self):
+        self.vmins[self.plot_ind] = float(self.rixsvmin.text())
+        self.vmaxs[self.plot_ind] = float(self.rixsvmax.text())
+        self.updateGraph()
+
+    def updateRIXSTop(self):
+        self.rixs_y_bounds[self.plot_ind][0] = float(self.rixsybot.text())
+        self.rixs_y_bounds[self.plot_ind][1] = float(self.rixsy.text())
+        self.updateGraph()
+
+    def updateRIXSYSpacing(self):
+        self.y_spacings[self.plot_ind] = float(self.rixsyspacingedit.text())
+        self.updateGraph()
 
 window = mainWindow()
 window.show()
