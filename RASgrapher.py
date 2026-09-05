@@ -114,16 +114,7 @@ class mainWindow(QMainWindow):
         cmaplabellayout = QHBoxLayout()
         cmapxlabellayout = QHBoxLayout()
 
-        rixscutlayout = QHBoxLayout()
-        rixsboundlayout = QHBoxLayout()
-
-        vminlayout = QHBoxLayout()
-        vmaxlayout = QHBoxLayout()
-
-        rixsybotlayout = QHBoxLayout()
-        rixsyboundlayout = QHBoxLayout()
-        rixsyspacinglayout = QHBoxLayout()
-
+        
         self.addplot = QPushButton("Add Plot", self)
         self.addplot.clicked.connect(self.addPlot)
         self.button =  QPushButton("Open Files", self)
@@ -187,27 +178,6 @@ class mainWindow(QMainWindow):
         self.cmapxlabellabel = QLabel("Set Color Map X Label: ")
         self.setcmapxlabel = QLineEdit(f"{self.cmapxlabel}")
         self.setcmapxlabel.returnPressed.connect(self.updateCMapXLabel)
-        self.rixsmapcutlabel = QLabel("Set RIXS Map Cut Energy: ")
-        self.rixsmapcut = QLineEdit(f"{self.rixscut}")
-        self.rixsmapcut.returnPressed.connect(self.updateRIXSCutEngy)
-        self.rixsmapboundlabel = QLabel("Set RIXS Map Lower Transfer Energy: ")
-        self.rixsmapbound = QLineEdit(f"{self.rixsbound}")
-        self.rixsmapbound.returnPressed.connect(self.updateRIXSUpperBoundEngy)
-        self.vminlabel = QLabel("Set RIXS Vmin: ")
-        self.rixsvmin = QLineEdit(f"{self.vmins[0]}", self)
-        self.rixsvmin.returnPressed.connect(self.updateRIXSNorm)
-        self.vmaxlabel = QLabel("Set RIXS Vmax: ")
-        self.rixsvmax = QLineEdit(f"{self.vmaxs[0]}", self)
-        self.rixsvmax.returnPressed.connect(self.updateRIXSNorm)
-        self.rixsylabel = QLabel("Set RIXS Y Upper Bound: ")
-        self.rixsy = QLineEdit(f"{self.rixs_y_bounds[0][1]}", self)
-        self.rixsy.returnPressed.connect(self.updateRIXSTop)
-        self.rixsybotlabel = QLabel("Set RIXS Y Lower Bound: ")
-        self.rixsybot = QLineEdit(f"{self.rixs_y_bounds[0][0]}", self)
-        self.rixsybot.returnPressed.connect(self.updateRIXSTop)
-        self.rixsyspacinglabel = QLabel("Set RIXS Y Spacing: ")
-        self.rixsyspacingedit = QLineEdit(f"{self.y_spacings[0]}", self)
-        self.rixsyspacingedit.returnPressed.connect(self.updateRIXSYSpacing)
         self.plotchoice = QComboBox()
         self.plotchoice.addItem("XRD Graph, Unnormalized")
         self.plotchoice.addItem("XRD Graph, Normalized")
@@ -221,9 +191,11 @@ class mainWindow(QMainWindow):
         self.plotchoice.currentIndexChanged.connect(self.updateGraph)
         self.save = QPushButton("Save", self)
         self.save.clicked.connect(self.saveFileDialog)
+
         
         
         #self.setCentralWidget(sc)
+        
         mlayout.setSpacing(0)
         self.sidebar = QWidget()
         self.sidebar.setLayout(slayout)
@@ -295,27 +267,6 @@ class mainWindow(QMainWindow):
 
         cmapxlabellayout.addWidget(self.cmapxlabellabel)
         cmapxlabellayout.addWidget(self.setcmapxlabel)
-
-        rixscutlayout.addWidget(self.rixsmapcutlabel)
-        rixscutlayout.addWidget(self.rixsmapcut)
-
-        rixsboundlayout.addWidget(self.rixsmapboundlabel)
-        rixsboundlayout.addWidget(self.rixsmapbound)
-
-        vminlayout.addWidget(self.vminlabel)
-        vminlayout.addWidget(self.rixsvmin)
-
-        vmaxlayout.addWidget(self.vmaxlabel)
-        vmaxlayout.addWidget(self.rixsvmax)
-
-        rixsybotlayout.addWidget(self.rixsybotlabel)
-        rixsybotlayout.addWidget(self.rixsybot)
-
-        rixsyboundlayout.addWidget(self.rixsylabel)
-        rixsyboundlayout.addWidget(self.rixsy)
-
-        rixsyspacinglayout.addWidget(self.rixsyspacinglabel)
-        rixsyspacinglayout.addWidget(self.rixsyspacingedit)
         
         slayout.addLayout(axeslayout)
         slayout.addLayout(toolslayout)
@@ -327,7 +278,7 @@ class mainWindow(QMainWindow):
 
         slayout.addWidget(self.plotchoice)
         slayout.addWidget(self.save)
-                
+        
         self.widget = QWidget()
         self.widget.setLayout(mlayout)
         self.setCentralWidget(self.widget)
